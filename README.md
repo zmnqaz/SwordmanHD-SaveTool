@@ -2,7 +2,11 @@
 
 [SwordmanHD](https://github.com/zmnqaz/SwordmanHD) (《天地劫：神魔至尊传》高清复刻) 的存档转换工具: 原版营地存档 (`GD00.GSF` ~ `GD04.GSF`) 和复刻版存档 (`save1.json` ~ `save5.json`) 互相转换。把存档拖进窗口就转换, 转好的存档一键放进游戏。
 
-## 使用
+## 下载
+
+到 [Releases](https://github.com/zmnqaz/SwordmanHD-SaveTool/releases) 下载自己系统的压缩包, 解压后双击 `SaveTool` (Windows 是 `SaveTool.exe`), 不用装 Python。macOS 第一次打开要右键 → 打开。想要最新的: 本仓库 Actions 页面里每次构建的 Artifacts。
+
+## 使用 (从源码)
 
 需要 Python 3.10 以上 (Windows / macOS 的官方安装包自带界面库; Linux 上 `sudo apt install python3-tk`)。
 
@@ -41,6 +45,10 @@ python3 savetool/export_gsf.py <复刻版存档文件夹> --out <原版游戏文
 - 只转**营地存档**。原版的战阵存档 `GAMEDATA.GCF` 要用游戏引擎转换, 这里不带, 见 SwordmanHD 仓库的 `tools/saves/import_gcf.py`。
 - **复刻版 → 原版还没有用原版程序实际读过**: 格式经 15 份原版存档「导入再导出」逐字节核对过, 但导出前请先备份你的原版存档。
 - 复刻版存档里的剧情变量、行囊等超出原版容量的部分会被丢弃 (会在输出里提示)。
+
+## 打包
+
+`pip install pyinstaller && python3 build.py` -> `dist/SwordmanHD-SaveTool-<系统>.zip`。GitHub 上推送即自动打包 (`.github/workflows/build.yml`), 打 `v*` 标签会发布到 Releases。
 
 ## 测试
 

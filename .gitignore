@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 转换后的存档/
+dist/
+build/
+*.spec

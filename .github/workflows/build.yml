@@ -1,0 +1,86 @@
+# 每次 push / PR: 跑测试, 并在 Windows / macOS / Linux 上打包成不用装 Python 的程序 (在运行页面的 Artifacts 里下载)。
+# 打 v* 标签 (如 git tag v0.1.0 && git push origin v0.1.0): 把各系统的包发布到 Releases。
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover tests
+
+  package:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, name: linux-x64}       # 用较老的系统打, 老发行版也能跑
+          - {os: windows-latest, name: windows-x64}
+          - {os: macos-latest, name: macos-arm64}     # Apple 芯片
+          - {os: macos-15-intel, name: macos-x64}     # Intel 芯片
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pyinstaller
+      - run: python build.py
+
+      # 冒烟: 程序能起来并且窗口一直开着 (5 秒内没有退出)
+      - name: smoke (linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+          unzip -q dist/*.zip -d smoke
+          xvfb-run -a timeout 5 smoke/*/SaveTool; code=$?
+          test "$code" = 124 || { echo "程序没有保持运行 (退出码 $code)"; exit 1; }
+      - name: smoke (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive dist/*.zip -DestinationPath smoke
+          $p = Start-Process (Get-ChildItem smoke -Recurse -Filter SaveTool.exe).FullName -PassThru
+          Start-Sleep 5
+          if ($p.HasExited) { throw "程序没有保持运行 (退出码 $($p.ExitCode))" }
+          Stop-Process $p
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SwordmanHD-SaveTool-${{ matrix.name }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: pkgs
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" pkgs/*.zip --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
+            --notes "解压后双击 SaveTool 即可 (Windows: SaveTool.exe)。macOS 第一次打开要右键 → 打开。"
