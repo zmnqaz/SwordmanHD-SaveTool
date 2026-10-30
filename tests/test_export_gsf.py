@@ -255,7 +255,7 @@ class ExportFilesTest(unittest.TestCase):
         self.assertNotIn("GD00.GSF", os.listdir(self.dst))
 
     def test_slot_option_with_file_and_bad_files(self):
-        with open(os.path.join(self.src, "save3.json"), "w") as f:
+        with open(os.path.join(self.src, "save3.json"), "w", encoding="utf-8") as f:
             f.write("{坏的")
         code, text = self.run_export()
         self.assertEqual(code, 1)          # 有一个读不了

@@ -279,23 +279,23 @@ class WriteTest(unittest.TestCase):
         # 目录已存在且有旧档时也不动
         os.makedirs(self.out_dir)
         old = os.path.join(self.out_dir, "save1.json")
-        with open(old, "w") as f:
+        with open(old, "w", encoding="utf-8") as f:
             f.write("OLD")
         G.main([self.src, "--out", self.out_dir, "--dry-run", "--force"], out=Quiet())
         self.assertEqual(os.listdir(self.out_dir), ["save1.json"])
-        with open(old) as f:
+        with open(old, encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
 
     def test_existing_slot_not_overwritten_without_force(self):
         self.gsf("GD00.GSF", gold=1)
         os.makedirs(self.out_dir)
         old = os.path.join(self.out_dir, "save1.json")
-        with open(old, "w") as f:
+        with open(old, "w", encoding="utf-8") as f:
             f.write("OLD")
         q = Quiet()
         self.assertEqual(G.main([self.src, "--out", self.out_dir], out=q), 3)
         self.assertIn("--force", q.text)
-        with open(old) as f:
+        with open(old, encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
         self.assertEqual(os.listdir(self.out_dir), ["save1.json"], "没有备份、没有临时文件")
 
@@ -303,20 +303,20 @@ class WriteTest(unittest.TestCase):
         # 游戏的 SaveFile.exists: 正式文件缺失但 .bak 在也算有档
         self.gsf("GD00.GSF")
         os.makedirs(self.out_dir)
-        with open(os.path.join(self.out_dir, "save1.json.bak"), "w") as f:
+        with open(os.path.join(self.out_dir, "save1.json.bak"), "w", encoding="utf-8") as f:
             f.write("OLD")
         self.assertEqual(G.main([self.src, "--out", self.out_dir], out=Quiet()), 3)
         self.assertEqual(G.main([self.src, "--out", self.out_dir, "--force"], out=Quiet()), 0)
         baks = [n for n in os.listdir(self.out_dir) if ".bak-" in n]
         self.assertEqual(len(baks), 1)
-        with open(os.path.join(self.out_dir, baks[0])) as f:
+        with open(os.path.join(self.out_dir, baks[0]), encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
 
     def test_force_backs_up_old_save_with_timestamp(self):
         self.gsf("GD00.GSF", gold=1)
         os.makedirs(self.out_dir)
         old = os.path.join(self.out_dir, "save1.json")
-        with open(old, "w") as f:
+        with open(old, "w", encoding="utf-8") as f:
             f.write("OLD")
         q = Quiet()
         self.assertEqual(G.main([self.src, "--out", self.out_dir, "--force"], out=q), 0)
@@ -324,13 +324,13 @@ class WriteTest(unittest.TestCase):
         baks = [n for n in os.listdir(self.out_dir) if n.startswith("save1.json.bak-")]
         self.assertEqual(len(baks), 1)
         self.assertRegex(baks[0], r"^save1\.json\.bak-\d{8}-\d{6}$")
-        with open(os.path.join(self.out_dir, baks[0])) as f:
+        with open(os.path.join(self.out_dir, baks[0]), encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
         self.assertIn("已备份旧档", q.text)
         # 同一秒再覆盖一次: 备份名不撞, 前一份备份不丢
         fixed = datetime.datetime(2026, 1, 2, 3, 4, 5)
         self.assertEqual(G.backup_path(old, fixed), old + ".bak-20260102-030405")
-        open(old + ".bak-20260102-030405", "w").close()
+        open(old + ".bak-20260102-030405", "w", encoding="utf-8").close()
         self.assertEqual(G.backup_path(old, fixed), old + ".bak-20260102-030405-2")
         self.assertEqual(G.main([self.src, "--out", self.out_dir, "--force"], out=Quiet()), 0)
         self.assertGreaterEqual(len([n for n in os.listdir(self.out_dir) if ".bak-" in n]), 2)
