@@ -49,7 +49,8 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
           unzip -q dist/*.zip -d smoke
-          xvfb-run -a timeout 5 smoke/*/SaveTool; code=$?
+          code=0
+          xvfb-run -a timeout 5 smoke/*/SaveTool || code=$?   # bash 带 -e, 不接住退出码脚本会提前中止
           test "$code" = 124 || { echo "程序没有保持运行 (退出码 $code)"; exit 1; }
       - name: smoke (windows)
         if: runner.os == 'Windows'
