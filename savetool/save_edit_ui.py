@@ -95,6 +95,7 @@ class EditPage:
         self.save_btn.pack(side="left")
         self.saveas_btn = ttk.Button(top, text="另存为…", command=self.save_as, state="disabled")
         self.saveas_btn.pack(side="left", padx=(6, 0))
+        self.build_hints(ttk)
         self.status = ttk.Label(self.frame, text="", font=(app.fam, 10), wraplength=700, justify="left")
         self.status.pack(fill="x", pady=(8, 6), anchor="w")
         self.inner = ttk.Notebook(self.frame)
@@ -107,6 +108,50 @@ class EditPage:
                 w.drop_target_register(app.dnd)
                 w.dnd_bind("<<Drop>>", lambda ev: self.open(next((p for p in app.root.tk.splitlist(ev.data)), None)))
         self.report_names()
+
+    # ------------------------------------------------------------ 存档位置
+
+    OTHER_PLACES = ("Windows  C:\\Users\\<你的用户名>\\AppData\\Roaming\\SwordmanHD\\\n"
+                    "macOS  ~/Library/Application Support/SwordmanHD/\n"
+                    "Linux  ~/.local/share/SwordmanHD/\n"
+                    "Android  /data/data/com.tdj.swordmanhd/files/saves (没 root 进不去; 游戏会同步一份到 /sdcard/Android/data/com.tdj.swordmanhd/files/saves/, 拷到电脑上改再拷回去)")
+
+    def build_hints(self, ttk):
+        """页顶提示存档在哪: 本机的位置 + 默认位置里已有存档的「存档 N」快速打开按钮; 其他系统 / 手机的位置点开才显示 (省高度)。"""
+        self.save_dir = E.default_save_dir()
+        box = ttk.Frame(self.frame)
+        box.pack(fill="x", pady=(8, 0))
+        row = ttk.Frame(box)
+        row.pack(fill="x")
+        ttk.Label(row, text="本机存档位置:", foreground=self.app.C["muted"], font=(self.app.fam, 10)).pack(side="left")
+        e = ttk.Entry(row, font=(self.app.fam, 10), width=44)
+        e.insert(0, self.save_dir)
+        e.configure(state="readonly")
+        e.pack(side="left", padx=6)
+        self.quick = ttk.Frame(row)
+        self.quick.pack(side="left")
+        self.others = ttk.Label(box, text=self.OTHER_PLACES, foreground=self.app.C["muted"], font=(self.app.fam, 9), justify="left", wraplength=860)
+        self.others_btn = ttk.Button(box, text="其他系统 / 手机的存档位置 ▾", command=self.toggle_others)
+        self.others_btn.pack(anchor="w", pady=(4, 0))
+        self.refresh_quick()
+
+    def toggle_others(self):
+        if self.others.winfo_ismapped():
+            self.others.pack_forget()
+            self.others_btn.configure(text="其他系统 / 手机的存档位置 ▾")
+        else:
+            self.others.pack(anchor="w", pady=(4, 0))
+            self.others_btn.configure(text="其他系统 / 手机的存档位置 ▴")
+
+    def refresh_quick(self):
+        for w in self.quick.winfo_children():
+            w.destroy()
+        ttk = self.app.ttk
+        found = E.existing_saves(self.save_dir)
+        ttk.Label(self.quick, text="快速打开:" if found else "这里还没有存档, 点「打开存档…」自己选",
+                  foreground=self.app.C["muted"], font=(self.app.fam, 10)).pack(side="left")
+        for slot, path in found:
+            ttk.Button(self.quick, text="存档 %d" % slot, width=7, command=lambda p=path: self.open(p)).pack(side="left", padx=(4, 0))
 
     # ------------------------------------------------------------ 公共
 
@@ -148,7 +193,8 @@ class EditPage:
         self.refresh()
 
     def pick(self):
-        p = self.app.fd.askopenfilename(title="选择复刻版存档", filetypes=[("复刻版存档", "*.json"), ("所有文件", "*")])
+        p = self.app.fd.askopenfilename(title="选择复刻版存档", filetypes=[("复刻版存档", "*.json"), ("所有文件", "*")],
+                                        **({"initialdir": self.save_dir} if os.path.isdir(self.save_dir) else {}))
         if p:
             self.open(p)
 

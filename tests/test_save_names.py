@@ -84,6 +84,23 @@ class NamesTest(unittest.TestCase):
         self.assertTrue(self.n.available)
 
 
+class EmbeddedTest(unittest.TestCase):
+    """内置的精简名字表 (save_names_data.py): 没有资源包也能按名字搜索、检查装备。"""
+
+    def test_nothing_found_falls_back_to_embedded_names(self):
+        with tempfile.TemporaryDirectory() as d:
+            n = N.load_names(pck=os.path.join(d, "nope.pck"), data_dir=os.path.join(d, "none"))
+        self.assertTrue(n.available)
+        self.assertEqual((n.item(178), n.unit(0)), ("燧石", "殷剑平"))
+        self.assertIn((178, "燧石"), n.search_items("燧"))
+        self.assertTrue(n.equippable("weapon", 0))
+        self.assertEqual(len(n.items), 374)
+
+    def test_embedded_has_only_names_and_equip_info(self):
+        row = N.embedded_names().items[178]
+        self.assertEqual(sorted(row), ["equip_units", "id", "name", "type"])
+
+
 class LoadTest(unittest.TestCase):
     def test_pck_then_data_dir_then_empty(self):
         with tempfile.TemporaryDirectory() as d:
@@ -96,7 +113,7 @@ class LoadTest(unittest.TestCase):
                 with open(os.path.join(data, k + ".json"), "w", encoding="utf-8") as f:
                     json.dump(v, f, ensure_ascii=False)
             self.assertEqual(N.load_names(pck=os.path.join(d, "nope.pck"), data_dir=data).item(178), "燧石")
-            self.assertFalse(N.load_names(pck=os.path.join(d, "nope.pck"), data_dir=os.path.join(d, "none")).available)
+            self.assertFalse(N.load_names(pck=os.path.join(d, "nope.pck"), data_dir=os.path.join(d, "none"), fallback=False).available)
 
     def test_find_pck_looks_in_resource_folders(self):
         with tempfile.TemporaryDirectory() as d:

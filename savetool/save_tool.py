@@ -255,8 +255,8 @@ class App:
         self.nb = nb
         if EU:   # 开发仓库才有的「修改存档」页
             self.editor = EU.EditPage(self, nb, load_names(), lambda pck: SN.load_names(pck=pck))
-            root.geometry("1000x940")
-            root.minsize(920, 900)
+            root.geometry("1000x980")
+            root.minsize(920, 940)
         if files:
             root.after(100, lambda: self.open_files(list(files)))
 

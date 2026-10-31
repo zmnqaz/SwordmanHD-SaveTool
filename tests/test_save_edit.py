@@ -28,6 +28,24 @@ def sample(**over):
     return s
 
 
+class SaveDirTest(unittest.TestCase):
+    def test_default_save_dir_per_platform(self):
+        self.assertEqual(E.default_save_dir("win32", {"APPDATA": "C:\\Users\\u\\AppData\\Roaming"}, "C:\\Users\\u"), os.path.join("C:\\Users\\u\\AppData\\Roaming", "SwordmanHD"))
+        self.assertEqual(E.default_save_dir("darwin", {}, "HOME"), os.path.join("HOME", "Library", "Application Support", "SwordmanHD"))
+        self.assertEqual(E.default_save_dir("linux", {}, "HOME"), os.path.join("HOME", ".local", "share", "SwordmanHD"))
+        self.assertEqual(E.default_save_dir("linux", {"XDG_DATA_HOME": "XDG"}, "HOME"), os.path.join("XDG", "SwordmanHD"))
+
+    def test_windows_without_appdata_uses_roaming_under_home(self):
+        self.assertEqual(E.default_save_dir("win32", {}, "C:\\Users\\u"), os.path.join("C:\\Users\\u", "AppData", "Roaming", "SwordmanHD"))
+
+    def test_existing_saves_lists_slots_in_order(self):
+        with tempfile.TemporaryDirectory() as d:
+            for n in ("save3.json", "save1.json", "save9.json", "battle.json", "save2.json.bak"):
+                open(os.path.join(d, n), "w").close()
+            self.assertEqual([(i, os.path.basename(p)) for i, p in E.existing_saves(d)], [(1, "save1.json"), (3, "save3.json")])
+            self.assertEqual(E.existing_saves(os.path.join(d, "nope")), [])
+
+
 class GoldTest(unittest.TestCase):
     def test_set_gold_in_range(self):
         s = sample()

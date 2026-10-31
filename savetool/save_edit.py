@@ -53,6 +53,30 @@ def check_int(v, what, lo, hi):
     return v
 
 
+# ---------------------------------------------------------------- 存档位置
+
+def default_save_dir(platform=None, env=None, home=None):
+    """复刻版存档目录 (游戏的 user://): Windows %APPDATA%\\SwordmanHD, macOS ~/Library/Application Support/SwordmanHD, Linux ~/.local/share/SwordmanHD。"""
+    platform = sys.platform if platform is None else platform
+    env = os.environ if env is None else env
+    home = os.path.expanduser("~") if home is None else home
+    if platform.startswith("win"):
+        return os.path.join(env.get("APPDATA") or os.path.join(home, "AppData", "Roaming"), "SwordmanHD")
+    if platform == "darwin":
+        return os.path.join(home, "Library", "Application Support", "SwordmanHD")
+    return os.path.join(env.get("XDG_DATA_HOME") or os.path.join(home, ".local", "share"), "SwordmanHD")
+
+
+def existing_saves(folder):
+    """文件夹里的 save1.json ~ save5.json [(存档位, 路径)], 按存档位排序; 没有这个文件夹返回空。"""
+    out = []
+    for i in range(1, 6):
+        p = os.path.join(folder, "save%d.json" % i)
+        if os.path.isfile(p):
+            out.append((i, p))
+    return out
+
+
 # ---------------------------------------------------------------- 读写
 
 def load(path):

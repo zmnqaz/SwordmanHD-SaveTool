@@ -2,7 +2,7 @@
 """存档修改器的名字表 (不依赖 tkinter): 物品 / 技能 / 人物的编号 -> 名字, 以及「这件物品这个人能不能装」。
 
 来源按顺序试: 资源包 common_story.pck (Godot pck, 文件原样排放, 这里只读目录取 content/tdj/data/ 下的三个 json, 不需要 Godot)
-→ game/content/tdj/data (有完整仓库时) → 都没有就是空表 (界面只显示编号, 不做名字/装备校验)。
+→ game/content/tdj/data (有完整仓库时) → 程序自带的精简名字表 save_names_data.py (只有名字、类型、谁能装; make_names_data.py 生成)。\n都没有才是空表 (界面只显示编号, 不做名字/装备校验)。
 """
 import json
 import os
@@ -87,8 +87,18 @@ def _tables(files):
     return Names(rows("items"), rows("skills"), rows("units"))
 
 
-def load_names(pck=None, data_dir=None):
-    """按 pck → data_dir 的顺序读; 都读不到返回空表。"""
+def embedded_names():
+    """程序自带的精简名字表 (save_names_data.py, 没有说明文字和数值); 缺了这个文件返回空表。"""
+    try:
+        import save_names_data as D
+    except ImportError:
+        return Names()
+    return Names([{"id": i, "name": n, "type": t, "equip_units": list(u)} for i, n, t, u in D.ITEMS],
+                 [{"id": i, "name": n} for i, n in D.SKILLS], [{"id": i, "name": n} for i, n in D.UNITS])
+
+
+def load_names(pck=None, data_dir=None, fallback=True):
+    """按 pck → data_dir → 内置名字表 (fallback=False 时不用) 的顺序读; 都没有返回空表。"""
     if pck and os.path.isfile(pck):
         try:
             names = _tables(read_pck_files(pck))
@@ -104,8 +114,10 @@ def load_names(pck=None, data_dir=None):
                     files[k + ".json"] = f.read()
             except OSError:
                 pass
-        return _tables(files)
-    return Names()
+        names = _tables(files)
+        if names.available:
+            return names
+    return embedded_names() if fallback else Names()
 
 
 def find_pck(dirs):
