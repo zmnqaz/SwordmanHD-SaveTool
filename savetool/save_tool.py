@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""存档转换工具 (界面): 两个页面, 「原版 → 复刻版」和「复刻版 → 原版」; 把存档拖进窗口就转换, 转好的可以一键放进游戏的存档位。
+"""存档工具 (界面): 三个页面, 「原版 → 复刻版」「复刻版 → 原版」和「修改存档」; 前两页把存档拖进窗口就转换, 转好的可以一键放进游戏的存档位; 第三页直接改复刻版存档的金钱、行囊、人物。
 
 用法:
     python3 tools/saves/save_tool.py [存档文件 ...]     (也可以直接把存档文件拖到这个脚本上)
@@ -19,6 +19,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.append(os.path.join(HERE, "_vendor"))   # 装了系统版的就用系统版, 没装用随仓库带的
 import save_ops as O  # noqa: E402
+try:   # 「修改存档」页的文件缺了 (比如只拷了转换用的几个文件) 就只显示转换两页
+    import save_edit_ui as EU  # noqa: E402
+    import save_names as SN  # noqa: E402
+except ImportError:
+    EU = SN = None
 from save_ops import GsfError, SlotTaken  # noqa: E402
 
 C = {"accent": "#005FB8", "line": "#C8CCD2", "tint": "#E5F0FB", "muted": "#6B6B6B", "ok": "#1E8E4E", "bad": "#C42B1C", "warn": "#9D5D00", "text": "#1B1B1B"}
@@ -223,10 +228,18 @@ class Page:
         status.configure(text=text, foreground=C["ok"])
 
 
+def load_names():
+    """物品 / 技能 / 人物名字表: 在程序旁边 (打包成 exe 时是 exe 所在目录)、当前目录和上几层找 resource/common_story.pck (见 save_names.py)。"""
+    dirs = SN.default_search_dirs(os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else HERE) + [os.getcwd()]
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(HERE)), "game", "content", "tdj", "data")
+    return SN.load_names(pck=SN.find_pck(dirs), data_dir=data_dir)
+
+
 class App:
     def __init__(self, root, tk, ttk, filedialog, tkfont, messagebox, files=()):
         self.root, self.tk, self.ttk, self.fd, self.mb = root, tk, ttk, filedialog, messagebox
-        root.title("天地劫 存档转换")
+        root.title("天地劫 存档工具")
+        self.C = C
         load_theme(root)
         families = set(tkfont.families())
         self.fam = next((f for f in FONT_FAMILIES if f in families), tkfont.nametofont("TkDefaultFont").actual("family"))
@@ -240,6 +253,10 @@ class App:
         nb.pack(fill="both", expand=True, padx=12, pady=12)
         self.pages = [Page(self, nb, spec) for spec in PAGES]
         self.nb = nb
+        if EU:   # 开发仓库才有的「修改存档」页
+            self.editor = EU.EditPage(self, nb, load_names(), lambda pck: SN.load_names(pck=pck))
+            root.geometry("1000x940")
+            root.minsize(920, 900)
         if files:
             root.after(100, lambda: self.open_files(list(files)))
 
