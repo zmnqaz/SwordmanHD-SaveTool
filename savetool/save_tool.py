@@ -255,8 +255,12 @@ class App:
         self.nb = nb
         if EU:   # 开发仓库才有的「修改存档」页
             self.editor = EU.EditPage(self, nb, load_names(), lambda pck: SN.load_names(pck=pck))
-            root.geometry("1000x980")
-            root.minsize(920, 940)
+            # 按内容定大小, 但不超过屏幕 (留出任务栏/标题栏); 放不下的部分「修改存档」页自己出滚动条
+            root.update_idletasks()
+            w = min(self.editor.frame.winfo_reqwidth() + 60, root.winfo_screenwidth() - 80)
+            h = min(self.editor.frame.winfo_reqheight() + 110, root.winfo_screenheight() - 140)
+            root.geometry("%dx%d" % (w, h))
+            root.minsize(min(640, w), min(480, h))
         if files:
             root.after(100, lambda: self.open_files(list(files)))
 

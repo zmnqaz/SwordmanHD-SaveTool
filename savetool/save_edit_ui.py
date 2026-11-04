@@ -23,6 +23,57 @@ def parse_id(text):
     return int(m.group(1)) if m else None
 
 
+def scrollable(tk, ttk, parent):
+    """可滚动的外框: 返回 (外框, 内框)。窗口放得下时内框撑满; 放不下 (小屏幕 / 系统缩放大) 时出滚动条, 滚轮也能滚。"""
+    outer = ttk.Frame(parent)
+    outer.rowconfigure(0, weight=1)
+    outer.columnconfigure(0, weight=1)
+    canvas = tk.Canvas(outer, highlightthickness=0, bd=0, yscrollincrement=20, xscrollincrement=20,
+                       bg=ttk.Style().lookup("TFrame", "background") or "#FAFAFA")
+    canvas.grid(row=0, column=0, sticky="nsew")
+    vs = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+    hs = ttk.Scrollbar(outer, orient="horizontal", command=canvas.xview)
+    canvas.configure(yscrollcommand=vs.set, xscrollcommand=hs.set)
+    inner = ttk.Frame(canvas)
+    item = canvas.create_window(0, 0, window=inner, anchor="nw")
+    last = [None]
+
+    def fit():
+        cw, ch, rw, rh = canvas.winfo_width(), canvas.winfo_height(), inner.winfo_reqwidth(), inner.winfo_reqheight()
+        if cw <= 1 or (cw, ch, rw, rh) == last[0]:
+            return
+        last[0] = (cw, ch, rw, rh)
+        w, h = max(cw, rw), max(ch, rh)
+        canvas.itemconfigure(item, width=w, height=h)
+        canvas.configure(scrollregion=(0, 0, w, h))
+        for bar, need, where in ((vs, rh > ch, {"row": 0, "column": 1, "sticky": "ns"}), (hs, rw > cw, {"row": 1, "column": 0, "sticky": "ew"})):
+            if need and not bar.winfo_ismapped():
+                bar.grid(**where)
+            elif not need and bar.winfo_ismapped():
+                bar.grid_remove()
+
+    def poll():   # 内容变多变少 (展开提示、出错提示) 不发事件, 隔一会儿看一眼
+        if outer.winfo_exists():
+            fit()
+            outer.after(300, poll)
+    canvas.bind("<Configure>", lambda e: fit())
+    outer.after(300, poll)
+
+    def wheel(event):
+        w = event.widget
+        if isinstance(w, str) or not str(w).startswith(str(outer)) or w.winfo_class() in ("Listbox", "Treeview", "TCombobox", "Text"):
+            return   # 别的页, 或者自己会滚的控件
+        n = -1 if getattr(event, "num", 0) == 4 or getattr(event, "delta", 0) > 0 else 1
+        if event.state & 1:   # Shift + 滚轮: 左右滚
+            if inner.winfo_reqwidth() > canvas.winfo_width():
+                canvas.xview_scroll(n * 3, "units")
+        elif inner.winfo_reqheight() > canvas.winfo_height():
+            canvas.yview_scroll(n * 3, "units")
+    for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+        outer.bind_all(seq, wheel, add="+")
+    return outer, inner
+
+
 class SlotEditor:
     """一个最多 10 格的编号列表 (技能 / 随身物品): 左边是现有的, 右边搜名字添加, 点「应用」写进队员记录。"""
 
@@ -83,8 +134,9 @@ class EditPage:
         self.d = self.path = None
         self.dirty = False
         tk, ttk = app.tk, app.ttk
-        self.frame = ttk.Frame(nb, padding=14)
-        nb.add(self.frame, text="修改存档")
+        self.outer, self.frame = scrollable(tk, ttk, nb)
+        self.frame.configure(padding=14)
+        nb.add(self.outer, text="修改存档")
         top = ttk.Frame(self.frame)
         top.pack(fill="x")
         ttk.Button(top, text="打开存档…", command=self.pick).pack(side="left")
@@ -213,7 +265,7 @@ class EditPage:
         self.dirty = False
         self.save_btn.configure(text="保存", state="normal")
         self.saveas_btn.configure(state="normal")
-        self.app.nb.select(self.frame)
+        self.app.nb.select(self.outer)
         self.say("已打开。改完点「保存」, 旧存档会先自动备份。", "muted")
         self.refresh()
 
@@ -353,7 +405,7 @@ class EditPage:
         f = ttk.Frame(self.inner, padding=10)
         self.inner.add(f, text="队员")
         self.uids = []
-        self.members = tk.Listbox(f, width=14, height=18, exportselection=False, font=(self.app.fam, 11))
+        self.members = tk.Listbox(f, width=12, height=10, exportselection=False, font=(self.app.fam, 11))
         self.members.pack(side="left", fill="y")
         self.members.bind("<<ListboxSelect>>", lambda e: self.member_selected())
         body = ttk.Frame(f, padding=(14, 0, 0, 0))
@@ -361,19 +413,19 @@ class EditPage:
         attrs = ttk.LabelFrame(body, text="属性", padding=8)
         attrs.pack(fill="x")
         self.vars = {}
-        for r, rows in enumerate((FIELD_ROWS, STAT_ROWS, SPIRIT_ROWS)):
+        for r, rows in enumerate((FIELD_ROWS, STAT_ROWS, SPIRIT_ROWS)):   # 名字和输入框同一行, 省高度
             for c, (key, text) in enumerate(rows):
-                ttk.Label(attrs, text=text).grid(row=r * 2, column=c, sticky="w", padx=4)
+                ttk.Label(attrs, text=text).grid(row=r, column=c * 2, sticky="e", padx=(8 if c else 0, 4))
                 self.vars[key] = tk.StringVar()
-                ttk.Entry(attrs, textvariable=self.vars[key], width=8).grid(row=r * 2 + 1, column=c, padx=4, pady=(0, 4))
-        ttk.Button(attrs, text="应用属性", style="Accent.TButton", command=self.apply_attrs).grid(row=0, column=6, rowspan=2, padx=10)
-        ttk.Label(attrs, text="等级 1~99  属性 0~500  HP/MP 上限 ≤ 32767", foreground=self.app.C["muted"], font=(self.app.fam, 9)).grid(row=6, column=0, columnspan=7, sticky="w", padx=4)
+                ttk.Entry(attrs, textvariable=self.vars[key], width=6).grid(row=r, column=c * 2 + 1, pady=2)
+        ttk.Button(attrs, text="应用属性", style="Accent.TButton", command=self.apply_attrs).grid(row=0, column=10, rowspan=2, padx=10)
+        ttk.Label(attrs, text="等级 1~99  属性 0~500  HP/MP 上限 ≤ 32767", foreground=self.app.C["muted"], font=(self.app.fam, 9)).grid(row=3, column=0, columnspan=11, sticky="w", pady=(4, 0))
         gear = ttk.LabelFrame(body, text="装备", padding=8)
         gear.pack(fill="x", pady=8)
         self.gear = {}
         for c, (slot, text) in enumerate(SLOT_NAMES):
             ttk.Label(gear, text=text).grid(row=0, column=c, sticky="w", padx=4)
-            self.gear[slot] = ttk.Combobox(gear, width=18)
+            self.gear[slot] = ttk.Combobox(gear, width=15)
             self.gear[slot].grid(row=1, column=c, padx=4)
         ttk.Button(gear, text="应用装备", style="Accent.TButton", command=self.apply_gear).grid(row=1, column=3, padx=10)
         lists = ttk.Frame(body)
